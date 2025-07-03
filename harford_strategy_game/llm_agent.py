@@ -231,16 +231,7 @@ class LLMGameAgent:
             return {}
 
         # Ensure the response starts with '{' … heuristically trim leading / trailing code fences.
-        # Strip common markdown code block fences
-        if response_text.startswith("```json"):
-            response_text = response_text[len("```json") :]
-            if response_text.endswith("```"):
-                response_text = response_text[: -len("```")]
-        elif response_text.startswith("```"):
-            response_text = response_text[len("```") :]
-            if response_text.endswith("```"):
-                response_text = response_text[: -len("```")]
-
+        response_text = self._strip_code_fences(response_text)
         response_text = response_text.strip()
 
         # Attempt to parse as JSON first.
