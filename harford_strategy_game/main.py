@@ -275,7 +275,7 @@ def run_game(args: argparse.Namespace) -> int:  # noqa: C901 – complexity is f
         LOGGER.info("Referee initialised, starting match…")
 
         # 3. Primary game loop
-        max_turns = args.turns if args.turns is not None else 50  # default cap
+        max_turns = args.turns if args.turns is not None else 250  # default cap
         referee.run(max_turns=max_turns)
 
         # 4. Wrap-up / scoreboard (placeholder until Referee exposes richer API)

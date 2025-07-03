@@ -234,6 +234,7 @@ class GameState:
             elif action_type == "attack":
                 target_id: str = cmd.get("target_id", "")
                 target_unit = self.units.get(target_id)
+                print(f"Attacking {target_id} with {unit_id}")
                 if (
                     target_unit
                     and target_unit.is_alive()
