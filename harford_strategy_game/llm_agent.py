@@ -231,4 +231,52 @@ class LLMGameAgent:
             return {}
 
         # Ensure the response starts with '{' … heuristically trim leading / trailing code fences.
-        if response_text.startswith("
+        # Strip common markdown code block fences
+        if response_text.startswith("```json"):
+            response_text = response_text[len("```json") :]
+            if response_text.endswith("```"):
+                response_text = response_text[: -len("```")]
+        elif response_text.startswith("```"):
+            response_text = response_text[len("```") :]
+            if response_text.endswith("```"):
+                response_text = response_text[: -len("```")]
+
+        response_text = response_text.strip()
+
+        # Attempt to parse as JSON first.
+        try:
+            return json.loads(response_text)
+        except json.JSONDecodeError:
+            # Fallback to ast.literal_eval for more lenient parsing
+            # (e.g. Python dicts with single quotes).
+            try:
+                evaluated = ast.literal_eval(response_text)
+                if isinstance(evaluated, dict):
+                    return evaluated
+                else:
+                    # Not a dictionary, which is what we expect for actions.
+                    print(
+                        f"[{self.team_name}] LLM response parsed by ast.literal_eval but was not a dict: {type(evaluated)}"
+                    )
+                    return {}
+            except (ValueError, SyntaxError, MemoryError, TypeError) as ast_err:
+                # `TypeError` can be raised by ast.literal_eval on deeply nested structures.
+                # `MemoryError` if the string is too large / complex.
+                print(
+                    f"[{self.team_name}] LLM response failed both JSON and ast.literal_eval parsing: {ast_err}"
+                )
+                return {}
+
+    def _fallback_pass_action(self, public_view_dict: JSONDict) -> JSONDict:
+        """
+        Generate a "pass" action for every unit controlled by this agent.
+        This is used when the LLM fails to provide a valid response.
+        """
+        pass_actions: JSONDict = {}
+        if "units" in public_view_dict and isinstance(public_view_dict["units"], list):
+            for unit_info in public_view_dict["units"]:
+                if isinstance(unit_info, dict) and unit_info.get("team_id") == self.team_id:
+                    unit_id = unit_info.get("id")
+                    if unit_id:
+                        pass_actions[unit_id] = _PASS_INSTRUCTION
+        return pass_actions
