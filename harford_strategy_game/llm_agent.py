@@ -64,7 +64,7 @@ class LLMGameAgent:
         Root system instruction defining rules of engagement and *strict*
         response guidelines (must output valid JSON, one action per unit,
         etc.).
-    model : str, default="gpt-3.5-turbo"
+    model : str, default="gpt-4.1-nano"
         Underlying model name; may be superseded by the ``OPENAI_MODEL``
         environment variable at runtime.
     temperature : float, default=0.7
@@ -79,7 +79,7 @@ class LLMGameAgent:
         team_id: int | str,
         team_name: str,
         system_prompt: str,
-        model: str = "gpt-3.5-turbo",
+        model: str = "gpt-4.1-nano",
         temperature: float = 0.7,
     ) -> None:
         self.team_id: int | str = team_id
@@ -96,6 +96,11 @@ class LLMGameAgent:
         # OpenAI key is looked up lazily; raise a descriptive error only when
         # the first API call is attempted.
         self._openai_api_key: Optional[str] = os.getenv("OPENAI_API_KEY")
+
+    @property
+    def name(self) -> str:
+        """Compatibility property for referee - returns team_name."""
+        return self.team_name
 
     # --------------------------------------------------------------------- #
     # Public API                                                            #
@@ -194,20 +199,21 @@ class LLMGameAgent:
                 "OPENAI_API_KEY environment variable not set – cannot contact LLM."
             )
 
-        openai.api_key = self._openai_api_key
+        # Create OpenAI client (v1.x API pattern)
+        client = openai.OpenAI(api_key=self._openai_api_key)
 
         last_err: Optional[Exception] = None
         for attempt in range(_MAX_RETRIES):
             try:
-                response = openai.ChatCompletion.create(
+                response = client.chat.completions.create(
                     model=self.model,
                     messages=messages,
                     temperature=self.temperature,
                 )
-                # OpenAI 0.x & 1.x both expose this path; adjust if API changes.
-                assistant_text = response.choices[0].message["content"]  # type: ignore[index]
-                return str(assistant_text)
-            except (openai.error.RateLimitError, openai.error.APIError) as err:
+                # OpenAI v1.x API pattern
+                assistant_text = response.choices[0].message.content
+                return str(assistant_text) if assistant_text else ""
+            except (openai.RateLimitError, openai.APIError) as err:
                 last_err = err
                 delay = _RETRY_BASE_DELAY_SEC * (2**attempt)
                 print(
@@ -230,5 +236,77 @@ class LLMGameAgent:
         if not response_text:
             return {}
 
-        # Ensure the response starts with '{' … heuristically trim leading / trailing code fences.
-        if response_text.startswith("
+        # Handle code fence blocks like ```json ... ``` or ``` ... ```
+        if "```" in response_text:
+            # Find content between code fences
+            start_fence = response_text.find("```")
+            if start_fence != -1:
+                # Look for the content after the first fence
+                content_start = response_text.find("\n", start_fence)
+                if content_start != -1:
+                    content_start += 1  # Skip the newline
+                    # Find the closing fence
+                    end_fence = response_text.find("```", content_start)
+                    if end_fence != -1:
+                        response_text = response_text[content_start:end_fence].strip()
+                    else:
+                        # No closing fence, take everything after opening fence
+                        response_text = response_text[content_start:].strip()
+
+        if not response_text.startswith('{'):
+            # Try to find JSON embedded in text
+            start_idx = response_text.find('{')
+            if start_idx != -1:
+                # Find matching closing brace
+                brace_count = 0
+                end_idx = start_idx
+                for i in range(start_idx, len(response_text)):
+                    if response_text[i] == '{':
+                        brace_count += 1
+                    elif response_text[i] == '}':
+                        brace_count -= 1
+                        if brace_count == 0:
+                            end_idx = i
+                            break
+                if brace_count == 0:
+                    response_text = response_text[start_idx:end_idx + 1]
+
+        # Try JSON parsing first (most reliable)
+        try:
+            parsed = json.loads(response_text)
+            if isinstance(parsed, dict):
+                return parsed
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+        # Fallback to ast.literal_eval for more forgiving parsing
+        try:
+            parsed = ast.literal_eval(response_text)
+            if isinstance(parsed, dict):
+                return parsed
+        except (ValueError, SyntaxError):
+            pass
+
+        # If all parsing attempts fail, return empty dict
+        return {}
+
+    def _fallback_pass_action(self, public_view_dict: JSONDict) -> JSONDict:
+        """
+        Generate a safe fallback action dict where all team units pass.
+        
+        This is called when LLM parsing fails or an exception occurs.
+        """
+        fallback_actions: JSONDict = {}
+        
+        # Extract team units from the public view
+        if "units" in public_view_dict and isinstance(public_view_dict["units"], list):
+            team_id = str(self.team_id)
+            for unit_data in public_view_dict["units"]:
+                if isinstance(unit_data, dict) and unit_data.get("team_id") == team_id:
+                    unit_id = unit_data.get("id")
+                    if unit_id:
+                        fallback_actions[unit_id] = copy.deepcopy(_PASS_INSTRUCTION)
+        
+        return fallback_actions
+
+
