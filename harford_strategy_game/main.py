@@ -111,6 +111,24 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         help="File path to write the JSON replay log.",
     )
 
+    # Visualization options
+    parser.add_argument(
+        "--no-visual",
+        action="store_true",
+        help="Disable enhanced visual display system (use basic text output).",
+    )
+    parser.add_argument(
+        "--web",
+        action="store_true",
+        help="Enable web-based visualization interface.",
+    )
+    parser.add_argument(
+        "--web-port",
+        type=int,
+        default=8080,
+        help="Port for web interface (default: 8080).",
+    )
+
     return parser
 
 
@@ -175,14 +193,20 @@ def _create_agents(model: str, temperature: float, seed: int | None) -> Tuple[LL
     return blue_agent, red_agent
 
 
-def _create_referee(blue_agent: LLMAgent, red_agent: LLMAgent) -> Referee:
+def _create_referee(blue_agent: LLMAgent, red_agent: LLMAgent, args: argparse.Namespace) -> Referee:
     """
     Wire-up the :class:`referee.Referee` object that governs the simulation.
     """
     # Pass the MapFactory class itself, not the result of calling build_initial_state
     map_obj = MapFactory
 
-    referee = Referee(map_obj, [blue_agent, red_agent])
+    referee = Referee(
+        map_obj, 
+        [blue_agent, red_agent],
+        enable_visualization=not args.no_visual,
+        enable_web_interface=args.web,
+        web_port=args.web_port
+    )
     return referee
 
 
@@ -238,6 +262,12 @@ def _display_opening_screen() -> None:
     print("   • Protect your HQ while advancing on the enemy")
     print("   • Control key terrain and chokepoints")
     print()
+    print("🎮 VISUALIZATION:")
+    print("   • Enhanced terminal display with colors and animations")
+    print("   • Use --web flag for interactive web interface")
+    print("   • Use --no-visual for basic text output")
+    print("   • Game replay automatically saved to JSON")
+    print()
     print("=" * 70)
     print("🚀 INITIALIZING BATTLEFIELD... Good luck, commanders!")
     print("=" * 70)
@@ -271,7 +301,7 @@ def run_game(args: argparse.Namespace) -> int:  # noqa: C901 – complexity is f
         LOGGER.info("Constructed agents: %s, %s", blue_agent.team_name, red_agent.team_name)
 
         # 2. Referee + map
-        referee = _create_referee(blue_agent, red_agent)
+        referee = _create_referee(blue_agent, red_agent, args)
         LOGGER.info("Referee initialised, starting match…")
 
         # 3. Primary game loop
