@@ -22,6 +22,9 @@ import os
 import sys
 import time
 from typing import Tuple
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Project-local imports
 # ---------------------------------------------------------------------------
@@ -89,7 +92,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--model",
         type=str,
-        default="gpt-3.5-turbo",
+        default="gpt-4.1-nano",
         help="Model name to use for *both* agents.",
     )
     parser.add_argument(
@@ -150,14 +153,14 @@ def _create_agents(model: str, temperature: float, seed: int | None) -> Tuple[LL
     red_seed = None if seed is None else seed + 7331
 
     blue_agent = LLMAgent(
-        team_id=0,
+        team_id="BlueCrabs",
         team_name="BlueCrabs",
         system_prompt=system_prompt,
         model=model,
         temperature=temperature,
     )
     red_agent = LLMAgent(
-        team_id=1,
+        team_id="BayBirds",
         team_name="BayBirds",
         system_prompt=system_prompt,
         model=model,

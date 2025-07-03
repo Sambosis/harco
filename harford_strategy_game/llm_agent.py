@@ -64,7 +64,7 @@ class LLMGameAgent:
         Root system instruction defining rules of engagement and *strict*
         response guidelines (must output valid JSON, one action per unit,
         etc.).
-    model : str, default="gpt-3.5-turbo"
+    model : str, default="gpt-4.1-nano"
         Underlying model name; may be superseded by the ``OPENAI_MODEL``
         environment variable at runtime.
     temperature : float, default=0.7
@@ -79,7 +79,7 @@ class LLMGameAgent:
         team_id: int | str,
         team_name: str,
         system_prompt: str,
-        model: str = "gpt-3.5-turbo",
+        model: str = "gpt-4.1-nano",
         temperature: float = 0.7,
     ) -> None:
         self.team_id: int | str = team_id
@@ -96,6 +96,11 @@ class LLMGameAgent:
         # OpenAI key is looked up lazily; raise a descriptive error only when
         # the first API call is attempted.
         self._openai_api_key: Optional[str] = os.getenv("OPENAI_API_KEY")
+
+    @property
+    def name(self) -> str:
+        """Compatibility property for referee - returns team_name."""
+        return self.team_name
 
     # --------------------------------------------------------------------- #
     # Public API                                                            #
@@ -194,20 +199,21 @@ class LLMGameAgent:
                 "OPENAI_API_KEY environment variable not set – cannot contact LLM."
             )
 
-        openai.api_key = self._openai_api_key
+        # Create OpenAI client (v1.x API pattern)
+        client = openai.OpenAI(api_key=self._openai_api_key)
 
         last_err: Optional[Exception] = None
         for attempt in range(_MAX_RETRIES):
             try:
-                response = openai.ChatCompletion.create(
+                response = client.chat.completions.create(
                     model=self.model,
                     messages=messages,
                     temperature=self.temperature,
                 )
-                # OpenAI 0.x & 1.x both expose this path; adjust if API changes.
-                assistant_text = response.choices[0].message["content"]  # type: ignore[index]
-                return str(assistant_text)
-            except (openai.error.RateLimitError, openai.error.APIError) as err:
+                # OpenAI v1.x API pattern
+                assistant_text = response.choices[0].message.content
+                return str(assistant_text) if assistant_text else ""
+            except (openai.RateLimitError, openai.APIError) as err:
                 last_err = err
                 delay = _RETRY_BASE_DELAY_SEC * (2**attempt)
                 print(
@@ -303,11 +309,4 @@ class LLMGameAgent:
         
         return fallback_actions
 
-    # --------------------------------------------------------------------- #
-    # Protocol compatibility                                                #
-    # --------------------------------------------------------------------- #
-    
-    @property
-    def name(self) -> str:
-        """Alias for team_name to match referee expectations."""
-        return self.team_name
+
