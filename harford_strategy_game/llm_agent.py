@@ -230,5 +230,84 @@ class LLMGameAgent:
         if not response_text:
             return {}
 
-        # Ensure the response starts with '{' … heuristically trim leading / trailing code fences.
-        if response_text.startswith("
+        # Handle code fence blocks like ```json ... ``` or ``` ... ```
+        if "```" in response_text:
+            # Find content between code fences
+            start_fence = response_text.find("```")
+            if start_fence != -1:
+                # Look for the content after the first fence
+                content_start = response_text.find("\n", start_fence)
+                if content_start != -1:
+                    content_start += 1  # Skip the newline
+                    # Find the closing fence
+                    end_fence = response_text.find("```", content_start)
+                    if end_fence != -1:
+                        response_text = response_text[content_start:end_fence].strip()
+                    else:
+                        # No closing fence, take everything after opening fence
+                        response_text = response_text[content_start:].strip()
+
+        if not response_text.startswith('{'):
+            # Try to find JSON embedded in text
+            start_idx = response_text.find('{')
+            if start_idx != -1:
+                # Find matching closing brace
+                brace_count = 0
+                end_idx = start_idx
+                for i in range(start_idx, len(response_text)):
+                    if response_text[i] == '{':
+                        brace_count += 1
+                    elif response_text[i] == '}':
+                        brace_count -= 1
+                        if brace_count == 0:
+                            end_idx = i
+                            break
+                if brace_count == 0:
+                    response_text = response_text[start_idx:end_idx + 1]
+
+        # Try JSON parsing first (most reliable)
+        try:
+            parsed = json.loads(response_text)
+            if isinstance(parsed, dict):
+                return parsed
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+        # Fallback to ast.literal_eval for more forgiving parsing
+        try:
+            parsed = ast.literal_eval(response_text)
+            if isinstance(parsed, dict):
+                return parsed
+        except (ValueError, SyntaxError):
+            pass
+
+        # If all parsing attempts fail, return empty dict
+        return {}
+
+    def _fallback_pass_action(self, public_view_dict: JSONDict) -> JSONDict:
+        """
+        Generate a safe fallback action dict where all team units pass.
+        
+        This is called when LLM parsing fails or an exception occurs.
+        """
+        fallback_actions: JSONDict = {}
+        
+        # Extract team units from the public view
+        if "units" in public_view_dict and isinstance(public_view_dict["units"], list):
+            team_id = str(self.team_id)
+            for unit_data in public_view_dict["units"]:
+                if isinstance(unit_data, dict) and unit_data.get("team_id") == team_id:
+                    unit_id = unit_data.get("id")
+                    if unit_id:
+                        fallback_actions[unit_id] = copy.deepcopy(_PASS_INSTRUCTION)
+        
+        return fallback_actions
+
+    # --------------------------------------------------------------------- #
+    # Protocol compatibility                                                #
+    # --------------------------------------------------------------------- #
+    
+    @property
+    def name(self) -> str:
+        """Alias for team_name to match referee expectations."""
+        return self.team_name
