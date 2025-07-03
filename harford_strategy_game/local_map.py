@@ -38,7 +38,7 @@ from typing import Dict, List, Tuple
 # Internal Imports                                                            #
 # --------------------------------------------------------------------------- #
 
-from .game_state import Coord, GameState, Tile, Unit
+from game_state import Coord, GameState, Tile, Unit
 
 # --------------------------------------------------------------------------- #
 # Public Constants                                                            #

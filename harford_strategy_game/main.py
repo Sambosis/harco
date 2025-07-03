@@ -176,8 +176,8 @@ def _create_referee(blue_agent: LLMAgent, red_agent: LLMAgent) -> Referee:
     """
     Wire-up the :class:`referee.Referee` object that governs the simulation.
     """
-    # Build or load the starting map / game-state.
-    map_obj = MapFactory.build_initial_state()  # Implementation deferred.
+    # Pass the MapFactory class itself, not the result of calling build_initial_state
+    map_obj = MapFactory
 
     referee = Referee(map_obj, [blue_agent, red_agent])
     return referee
