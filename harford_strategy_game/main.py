@@ -190,6 +190,60 @@ def _create_referee(blue_agent: LLMAgent, red_agent: LLMAgent) -> Referee:
 # Main Execution Logic                                                        #
 # --------------------------------------------------------------------------- #
 
+def _display_opening_screen() -> None:
+    """
+    Display the welcome screen with game rules and objectives.
+    """
+    print("\n" + "=" * 70)
+    print("🦀⚔️🦅  WELCOME TO HARFORD COUNTY CLASH  🦅⚔️🦀")
+    print("=" * 70)
+    print()
+    print("🎯 OBJECTIVE:")
+    print("   Two AI factions battle for dominance across Harford County, MD!")
+    print("   Win by capturing the enemy headquarters or eliminating all enemy units.")
+    print()
+    print("⚔️ FACTIONS:")
+    print("   🦀 BlueCrabs  - HQ: Bel Air (center-left)")
+    print("   🦅 BayBirds   - HQ: Havre de Grace (upper-right)")
+    print()
+    print("🎮 GAME RULES:")
+    print("   • 10×10 battlefield with real Harford County landmarks")
+    print("   • Each team starts with 3 units (10 HP, 5 attack power)")
+    print("   • Turn-based with alternating first-player advantage")
+    print("   • Fog of war: 2-tile visibility radius around your units")
+    print()
+    print("📋 UNIT ACTIONS (per turn):")
+    print("   • MOVE: One tile in cardinal directions (N/S/E/W)")
+    print("   • ATTACK: Target adjacent enemy (1 tile away)")
+    print("   • PASS: Skip turn")
+    print()
+    print("🏆 VICTORY CONDITIONS:")
+    print("   1. Capture enemy headquarters (move unit onto HQ)")
+    print("   2. Eliminate all enemy units")
+    print("   3. Default turn limit: 50 turns (then draw)")
+    print()
+    print("🗺️ TERRAIN:")
+    print("   • Rural/Urban: Normal movement and combat")
+    print("   • Water: Impassable terrain")
+    print()
+    print("⚡ COMBAT MECHANICS:")
+    print("   • All actions resolve simultaneously each turn")
+    print("   • Movement conflicts result in no movement")
+    print("   • Attacks deal 5 damage, multiple hits stack")
+    print("   • Units are destroyed at 0 HP")
+    print()
+    print("🎲 STRATEGY TIPS:")
+    print("   • Coordinate units for maximum effectiveness")
+    print("   • Use fog of war to conceal movements")
+    print("   • Protect your HQ while advancing on the enemy")
+    print("   • Control key terrain and chokepoints")
+    print()
+    print("=" * 70)
+    print("🚀 INITIALIZING BATTLEFIELD... Good luck, commanders!")
+    print("=" * 70)
+    print()
+
+
 def run_game(args: argparse.Namespace) -> int:  # noqa: C901 – complexity is fine
     """
     High-level orchestration function.
@@ -199,6 +253,9 @@ def run_game(args: argparse.Namespace) -> int:  # noqa: C901 – complexity is f
     int
         OS return code (``0`` on success, ``1`` on fatal error).
     """
+    # Display welcome screen with rules
+    _display_opening_screen()
+    
     start = time.perf_counter()
 
     try:
